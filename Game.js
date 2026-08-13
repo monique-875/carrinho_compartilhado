@@ -1,72 +1,148 @@
+// Importa a biblioteca principal do React e os "Hooks" para gerenciar o estado e ciclo de vida do jogo
 import React, { useEffect, useRef, useState } from 'react';
+
+// Importa os componentes visuais e utilitários nativos para montar a interface do aplicativo
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-  useWindowDimensions,
+  View,               // Bloco/caixa de layout (equivalente a uma <div> na web)
+  Text,               // Componente para exibir textos na tela
+  TouchableOpacity,   // Botão clicável que reduz a opacidade ao ser tocado
+  StyleSheet,         // Módulo para criar e organizar os estilos CSS no React Native
+  Platform,           // Permite identificar se o app está rodando em iOS ou Android
+  useWindowDimensions,// Hook para obter a largura e altura em tempo real da tela do celular
 } from 'react-native';
+
+// Importa o Hook para calcular as áreas seguras da tela (evita a barra de status e a área da câmera/notch)
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+// Importa os elementos de renderização gráfica 2D de alta performance da biblioteca Skia
 import {
-  Canvas,
-  Fill,
-  Group,
-  Oval,
-  RoundedRect,
-  Rect,
-  Circle,
-  DashPathEffect,
+  Canvas,         // A "lousa/tela" onde todos os gráficos 2D de alto desempenho são desenhados
+  Fill,           // Preenche todo o fundo do Canvas com uma cor específica
+  Group,          // Agrupa múltiplos elementos visuais para aplicar transformações (como mover ou girar) juntos
+  Oval,           // Desenha formas ovais ou elipses
+  RoundedRect,    // Desenha retângulos com cantos arredondados (usado no corpo dos carros)
+  Rect,           // Desenha retângulos tradicionais com cantos retos
+  Circle,         // Desenha círculos perfeitos (usado em faróis e vegetação)
+  DashPathEffect, // Aplica efeito de linha tracejada nos contornos (usado na faixa central do asfalto)
 } from '@shopify/react-native-skia';
+
+// Importa o módulo de sensores do Expo para ler a inclinação, giroscópio e aceleração do celular
 import { DeviceMotion } from 'expo-sensors';
 
-/* ============ CONFIG ============ */
-const TILT_MAX_DEG = 24; 
+// --- CONFIGURAÇÕES DE MOVIMENTO E INCLINAÇÃO ---
+
+// Define o ângulo máximo (em graus) que a inclinação do celular vai registrar para fazer o carro virar
+const TILT_MAX_DEG = 24;
+
+// Converte o ângulo máximo de graus para RADIANOS (fórmula da matemática necessária para o código fazer cálculos de física)
 const TILT_MAX_RAD = (TILT_MAX_DEG * Math.PI) / 180;
-const TURN_RATE = 3.1; 
-const BASE_SPEED = 205; 
+
+// Multiplicador da taxa de curva: define quão rápido ou sensível o carro responde ao girar o celular
+const TURN_RATE = 3.1;
+
+// Velocidade inicial (mínima) do carro do jogador ao começar a partida
+const BASE_SPEED = 205;
+
+// Velocidade máxima que o carro do jogador pode atingir
 const MAX_SPEED = 330;
-const SPEED_RAMP_TIME = 45; 
+
+// Tempo (em segundos) necessário para o jogo ir aumentando a velocidade do carro da inicial até a máxima
+const SPEED_RAMP_TIME = 45;
+
+
+// --- DIMENSÕES DOS VEÍCULOS ---
+
+// Raio de colisão do jogador (usado para detectar batidas/contatos em forma de círculo)
 const PLAYER_RADIUS = 15;
+
+// Raio de colisão dos carrinhos adversários (NPCs)
 const NPC_RADIUS = 15;
+
+// Comprimento (altura) do visual do carro do jogador em pixels
 const PLAYER_LEN = 34;
+
+// Largura do visual do carro do jogador em pixels
 const PLAYER_WID = 17;
+
+// Comprimento (altura) do visual dos carrinhos adversários em pixels
 const NPC_LEN = 32;
+
+// Largura do visual dos carrinhos adversários em pixels
 const NPC_WID = 16;
 
+
+// --- DIMENSÕES DA PISTA DE CORRIDA ---
+
+// Largura e altura da borda EXTERNA da pista oval (onde ficam as zebras/grama de fora)
 const TRACK_OUTER_X = 950;
 const TRACK_OUTER_Y = 620;
+
+// Largura e altura da borda INTERNA da pista oval (o canteiro central do circuito)
 const TRACK_INNER_X = 480;
 const TRACK_INNER_Y = 230;
 
-const COLOR_BG_DEEP = '#10131a';
-const COLOR_PANEL = '#1b2130';
-const COLOR_AMBER = '#ffb703';
-const COLOR_CYAN = '#4cc9f0';
-const COLOR_DANGER = '#ff4d4f';
-const COLOR_TEXT_HI = '#f5f3ee';
-const COLOR_TEXT_MID = '#aab0bf';
-const COLOR_GRASS = '#4b9646'; 
-const COLOR_ASPHALT = '#33363f';
-const COLOR_EDGE = '#f5f3ee';
 
-/* ============ HELPERS ============ */
+// --- PALETA DE CORES DO JOGO (Códigos Hexadecimais de Cor) ---
+
+// Cor de fundo geral do aplicativo (azul/cinza muito escuro)
+const COLOR_BG_DEEP = '#10131a';
+
+// Cor de fundo para os painéis de menu e telas de aviso (azul escuro)
+const COLOR_PANEL = '#1b2130';
+
+// Cor amarelada/dourada para destaques, pontuação ou elementos importantes
+const COLOR_AMBER = '#ffb703';
+
+// Cor ciano/azul claro vibrante para botões, detalhes ou luzes
+const COLOR_CYAN = '#4cc9f0';
+
+// Cor vermelha de alerta (usada para colisões, game over ou avisos de perigo)
+const COLOR_DANGER = '#ff4d4f';
+
+// Cor do texto principal (branco levemente amarelado para não cansar a vista)
+const COLOR_TEXT_HI = '#f5f3ee';
+
+// Cor do texto secundário (cinza claro para informações menos importantes)
+const COLOR_TEXT_MID = '#aab0bf';
+
+// Cor verde da grama que fica em volta e dentro da pista
+const COLOR_GRASS = '#4b9646';
+
+// Cor cinza escuro do asfalto da pista de corrida
+const COLOR_ASPHALT = '#33363f';
+
+// Cor clara (branca/off-white) para pintar as faixas e bordas da pista
+const COLOR_EDGE = '#f5f3ee';
+/* ============ HELPERS (Funções Utilitárias / Auxiliares) ============ */
+
+// Limita um valor (v) dentro de um intervalo entre o mínimo (lo) e o máximo (hi)
 function clamp(v, lo, hi) {
   return Math.max(lo, Math.min(hi, v));
 }
+
+// Retorna -1 se o número for negativo, ou 1 se for positivo (usado para saber a direção do movimento)
 function sign(v) {
   return v < 0 ? -1 : 1;
 }
+
+// Converte o tempo em segundos para o formato "Minutos:Segundos.Milésimos" (ex: "1:05.32")
 function formatTime(s) {
+  // Calcula a quantidade inteira de minutos
   const m = Math.floor(s / 60);
+  // Pega os segundos restantes após tirar os minutos
   const secNum = s - m * 60;
+  // Arredonda os segundos para 2 casas decimais e transforma em texto
   let secStr = secNum.toFixed(2);
+  // Adiciona um zero à esquerda se os segundos forem menores que 10 (ex: "09.50")
   if (secNum < 10) secStr = '0' + secStr;
+  // Retorna a string formatada no padrão mm:ss.ms
   return m + ':' + secStr;
 }
 
+// Cria a "receita" (configurações) dos carros adversários (NPCs)
 function makeNpcDefs() {
   return [
+    // t: posição na largura da pista, theta: ângulo na curva, w: velocidade angular, color: cor
     { t: 0.28, theta: 0.0, w: 0.55, color: '#e63946' },
     { t: 0.52, theta: 1.35, w: 0.42, color: '#f4a261' },
     { t: 0.78, theta: 2.75, w: 0.36, color: '#2a9d8f' },
@@ -75,6 +151,8 @@ function makeNpcDefs() {
     { t: 0.87, theta: 0.85, w: 0.3, color: '#3a86ff' },
   ];
 }
+
+// Cria a lista de objetos dos carrinhos adversários com suas posições x, y e ângulo iniciais zerados
 function makeNpcs() {
   return makeNpcDefs().map((d) => ({
     t: d.t,
@@ -87,67 +165,86 @@ function makeNpcs() {
   }));
 }
 
+// Cria automaticamente 28 cenários/objetos de decoração (árvores e arbustos) ao redor da pista
 const PROPS = (function buildProps() {
   const list = [];
+  // Loop para gerar 28 elementos visuais
   for (let i = 0; i < 28; i++) {
+    // Calcula a posição em ângulo em volta do circuito
     const theta = (i / 28) * Math.PI * 2 + (i % 2) * 0.11;
+    // Calcula o raio X (distância do centro) para colocar a árvore fora da pista
     const rx = TRACK_OUTER_X + 90 + ((i * 37) % 90);
+    // Calcula o raio Y para colocar a árvore fora da pista
     const ry = TRACK_OUTER_Y + 55 + ((i * 53) % 80);
+    // Adiciona o objeto à lista com posição, tamanho e se é arbusto ou árvore
     list.push({
       x: Math.cos(theta) * rx,
       y: Math.sin(theta) * ry,
       r: 12 + ((i * 17) % 12),
-      bush: i % 3 === 0,
+      bush: i % 3 === 0, // A cada 3 elementos, define como arbusto
     });
   }
   return list;
 })();
 
+// Quantidade de blocos quadriculados da linha de chegada
 const START_LINE_SEGS = 8;
+
+// Monta os segmentos de cor intercalada (zebra) para a linha de chegada
 const START_LINE = (function buildStartLine() {
   const y1 = -TRACK_OUTER_Y;
   const y2 = -TRACK_INNER_Y;
+  // Calcula a altura de cada segmento quadriculado
   const segH = (y2 - y1) / START_LINE_SEGS;
   const list = [];
   for (let i = 0; i < START_LINE_SEGS; i++) {
     list.push({
       y: y1 + i * segH,
       h: segH + 0.5,
+      // Intercala entre a cor clara da borda e uma cor escura
       color: i % 2 === 0 ? COLOR_EDGE : '#20222a',
     });
   }
   return list;
 })();
 
+// Função que define as informações iniciais quando o jogo começa ou recomeça
 function createInitialState() {
+  // Posição inicial e ângulo do jogador
   const player = {
     x: 0,
-    y: (TRACK_INNER_Y + TRACK_OUTER_Y) / 2,
-    angle: -Math.PI / 2,
+    y: (TRACK_INNER_Y + TRACK_OUTER_Y) / 2, // Fica exatamente no meio da pista
+    angle: -Math.PI / 2, // Apontando para cima
     speed: BASE_SPEED,
   };
+  // Retorna o objeto com todo o estado inicial do jogo
   return {
-    screen: 'start', 
+    screen: 'start', // Tela inicial
     player,
-    camera: { x: player.x, y: player.y - 40 },
-    npcs: makeNpcs(),
-    particles: [],
-    elapsed: 0,
-    bestTime: 0,
-    hasTiltData: false,
-    invertSteer: false,
-    tiltSteerRaw: 0,
-    touchSteer: 0,
-    steerDisplay: 0,
-    shakeTime: 0,
+    camera: { x: player.x, y: player.y - 40 }, // Câmera posicionada um pouco à frente do jogador
+    npcs: makeNpcs(), // Adiciona os adversários
+    particles: [], // Lista de faíscas/fumaça da batida
+    elapsed: 0, // Cronômetro de tempo
+    bestTime: 0, // Recorde de tempo
+    hasTiltData: false, // Confirma se o sensor está funcionando
+    invertSteer: false, // Inverter direção da curva
+    tiltSteerRaw: 0, // Leitura bruta do sensor
+    touchSteer: 0, // Entrada do controle por toque
+    steerDisplay: 0, // Valor final usado para virar o carro
+    shakeTime: 0, // Duração do tremor de tela na batida
   };
 }
 
+// COMPONENTE VISUAL: Desenha a forma do carrinho (jogador ou NPC)
 function CarShape({ x, y, angle, len, wid, color, isPlayer }) {
   return (
+    // Agrupa todos os desenhos do carro e os posiciona/rotaciona de uma só vez
     <Group transform={[{ translateX: x }, { translateY: y }, { rotate: angle }]}>
+      {/* Sombra do carro */}
       <RoundedRect x={-len / 2 + 3} y={-wid / 2 + 4} width={len} height={wid} r={5} color="rgba(0,0,0,0.28)" />
+      {/* Corpo principal do carro */}
       <RoundedRect x={-len / 2} y={-wid / 2} width={len} height={wid} r={6} color={color} />
+      {/* Contorno em volta do carro */}
       <RoundedRect
         x={-len / 2}
         y={-wid / 2}
@@ -158,6 +255,7 @@ function CarShape({ x, y, angle, len, wid, color, isPlayer }) {
         strokeWidth={1.4}
         color="rgba(0,0,0,0.35)"
       />
+      {/* Para-brisa (vidro dianteiro) */}
       <RoundedRect
         x={len * 0.06}
         y={-wid / 2 + 3}
@@ -166,8 +264,11 @@ function CarShape({ x, y, angle, len, wid, color, isPlayer }) {
         r={3}
         color="rgba(205,228,255,0.7)"
       />
+      {/* Farol Esquerdo */}
       <Circle cx={len / 2 - 3} cy={-wid / 2 + 3} r={2.1} color={isPlayer ? '#fff59d' : '#ffe08a'} />
+      {/* Farol Direito */}
       <Circle cx={len / 2 - 3} cy={wid / 2 - 3} r={2.1} color={isPlayer ? '#fff59d' : '#ffe08a'} />
+      {/* Faixa decorativa no teto (exclusiva do jogador) */}
       {isPlayer && (
         <Rect x={-len / 2 + 4} y={-2} width={len - 8} height={4} color="rgba(255,255,255,0.85)" />
       )}
@@ -175,42 +276,54 @@ function CarShape({ x, y, angle, len, wid, color, isPlayer }) {
   );
 }
 
+// COMPONENTE PRINCIPAL DO JOGO
 export default function Game() {
+  // Referência para guardar o estado do jogo sem disparar re-renderizações desnecessárias
   const stateRef = useRef(createInitialState());
+  // Guarda a inscrição/conexão do sensor de movimento do celular
   const motionSub = useRef(null);
 
-  const [screen, setScreen] = useState('start');
-  const [, forceRender] = useState(0);
-  const [invertChecked, setInvertChecked] = useState(false);
-  const [finalTimeText, setFinalTimeText] = useState('0:00.00');
-  const [bestTimeText, setBestTimeText] = useState('0:00.00');
+  // Estados do React para controlar a interface gráfica
+  const [screen, setScreen] = useState('start'); // Controla qual tela está aberta
+  const [, forceRender] = useState(0); // Força a atualização visual do jogo a cada frame
+  const [invertChecked, setInvertChecked] = useState(false); // Armazena a opção de inverter direção
+  const [finalTimeText, setFinalTimeText] = useState('0:00.00'); // Texto do tempo final
+  const [bestTimeText, setBestTimeText] = useState('0:00.00'); // Texto do melhor tempo
 
+  // Mede as dimensões da janela do celular
   const { width: winW, height: winH } = useWindowDimensions();
+  // Obtém o espaço seguro das bordas (notch/câmera do celular)
   const insets = useSafeAreaInsets();
 
+  // Função para mudar de tela no jogo (ex: 'start' -> 'playing')
   const changeScreen = (next) => {
     stateRef.current.screen = next;
     setScreen(next);
   };
 
+  // Processa as leituras recebidas do sensor de inclinação do celular
   const handleMotion = (measurement) => {
     const rotation = measurement && measurement.rotation;
     if (!rotation) return;
-    const beta = rotation.beta;
+    const beta = rotation.beta; // Ângulo de inclinação lateral
     if (beta === null || beta === undefined) return;
     const g = stateRef.current;
-    g.hasTiltData = true;
+    g.hasTiltData = true; // Confirma que o sensor está funcionando
+    // Normaliza a inclinação entre -1 (total esquerda) e 1 (total direita)
     g.tiltSteerRaw = clamp(beta / TILT_MAX_RAD, -1, 1);
   };
 
+  // Ativa a escuta contínua do sensor de movimento do celular
   const attachOrientation = () => {
     if (motionSub.current) return;
-    DeviceMotion.setUpdateInterval(16);
+    DeviceMotion.setUpdateInterval(16); // Atualiza aproximadamente a cada 16ms (60 FPS)
     motionSub.current = DeviceMotion.addListener(handleMotion);
   };
 
+  // Cria o efeito visual de explosão/faíscas em uma colisão
   const spawnCrash = (x, y) => {
     const g = stateRef.current;
+    // Gera 22 partículas voando em direções aleatórias
     for (let i = 0; i < 22; i++) {
       const a = Math.random() * Math.PI * 2;
       const sp = 70 + Math.random() * 210;
@@ -224,19 +337,22 @@ export default function Game() {
         color: Math.random() < 0.5 ? COLOR_AMBER : COLOR_DANGER,
       });
     }
-    g.shakeTime = 0.35;
+    g.shakeTime = 0.35; // Ativa a trepidação da câmera por 0.35 segundos
   };
 
+  // Dispara o Fim de Jogo quando ocorre uma batida
   const triggerGameOver = (x, y) => {
     const g = stateRef.current;
     if (g.screen !== 'playing') return;
-    spawnCrash(x, y);
+    spawnCrash(x, y); // Cria a explosão
+    // Atualiza o recorde pessoal se o tempo atual for maior
     if (g.elapsed > g.bestTime) g.bestTime = g.elapsed;
     setFinalTimeText(formatTime(g.elapsed));
     setBestTimeText(formatTime(g.bestTime));
-    changeScreen('gameover');
+    changeScreen('gameover'); // Vai para a tela de Game Over
   };
 
+  // Reseta o jogador, adversários e variáveis para o estado inicial da pista
   const resetWorld = () => {
     const g = stateRef.current;
     g.player.x = 0;
@@ -251,14 +367,17 @@ export default function Game() {
     g.shakeTime = 0;
   };
 
+  // Inicia a partida
   const beginPlay = () => {
     resetWorld();
     changeScreen('playing');
   };
 
+  // Trata o clique no botão de Jogar
   const handlePlayPress = () => {
     stateRef.current.invertSteer = invertChecked;
     const needsPermission = Platform.OS === 'ios';
+    // Se for iPhone, pede permissão para o sensor primeiro
     if (needsPermission) {
       changeScreen('permission');
     } else {
@@ -267,6 +386,7 @@ export default function Game() {
     }
   };
 
+  // Pede a permissão de acesso ao sensor no iOS
   const handleGrantPress = async () => {
     try {
       const res = await DeviceMotion.requestPermissionsAsync();
@@ -275,23 +395,28 @@ export default function Game() {
     beginPlay();
   };
 
+  // Funções para os botões secundários nos menus
   const handleSkipPress = () => beginPlay();
   const handleRespawnPress = () => beginPlay();
 
+  // LOOP DE ATUALIZAÇÃO DA FÍSICA (Executado a cada quadro/frame do jogo)
   const update = (dt) => {
     const g = stateRef.current;
 
+    // Atualiza o movimento e o tempo de vida das partículas de explosão
     for (let i = g.particles.length - 1; i >= 0; i--) {
       const p = g.particles[i];
       p.x += p.vx * dt;
       p.y += p.vy * dt;
-      p.vx *= 0.94;
+      p.vx *= 0.94; // Desaceleração por atrito
       p.vy *= 0.94;
       p.life -= dt;
-      if (p.life <= 0) g.particles.splice(i, 1);
+      if (p.life <= 0) g.particles.splice(i, 1); // Remove partícula morta
     }
+    // Reduz o tempo de tremor da tela
     if (g.shakeTime > 0) g.shakeTime = Math.max(0, g.shakeTime - dt);
 
+    // Movel os carros adversários (NPCs) ao longo da curva oval
     for (let i = 0; i < g.npcs.length; i++) {
       const n = g.npcs[i];
       n.theta += n.w * dt;
@@ -299,54 +424,70 @@ export default function Game() {
       const ry = TRACK_INNER_Y + n.t * (TRACK_OUTER_Y - TRACK_INNER_Y);
       n.x = Math.cos(n.theta) * rx;
       n.y = Math.sin(n.theta) * ry;
+      // Calcula a rotação correta do carrinho acompanhando a curva da pista
       const dx = -Math.sin(n.theta) * rx * sign(n.w);
       const dy = Math.cos(n.theta) * ry * sign(n.w);
       n.angle = Math.atan2(dy, dx);
     }
 
+    // Define se o volante usará o sensor de inclinação ou os botões da tela
     const steer = g.hasTiltData ? g.tiltSteerRaw * (g.invertSteer ? -1 : 1) : g.touchSteer;
     g.steerDisplay = steer;
 
+    // Se estiver no meio da partida
     if (g.screen === 'playing') {
-      g.elapsed += dt;
+      g.elapsed += dt; // Incrementa o tempo de jogo
+      // Aumenta gradualmente a velocidade máxima conforme o tempo passa
       const rampT = clamp(g.elapsed / SPEED_RAMP_TIME, 0, 1);
       const targetSpeed = BASE_SPEED + (MAX_SPEED - BASE_SPEED) * rampT;
+      // Vira o ângulo do carro do jogador
       g.player.angle += steer * TURN_RATE * dt;
+     
+      // Checa se o jogador está dentro dos limites do asfalto
       const rOuter = Math.hypot(g.player.x / TRACK_OUTER_X, g.player.y / TRACK_OUTER_Y);
       const rInner = Math.hypot(g.player.x / TRACK_INNER_X, g.player.y / TRACK_INNER_Y);
       const onTrack = rOuter <= 1.08 && rInner >= 0.92;
+     
+      // Se sair para a grama, reduz a velocidade pela metade
       g.player.speed = targetSpeed * (onTrack ? 1 : 0.55);
+      // Move o jogador para frente com base no ângulo atual
       g.player.x += Math.cos(g.player.angle) * g.player.speed * dt;
       g.player.y += Math.sin(g.player.angle) * g.player.speed * dt;
+      // Faz a câmera seguir o jogador suavemente
       g.camera.x += (g.player.x - g.camera.x) * 0.12;
       g.camera.y += (g.player.y - g.camera.y) * 0.12;
 
+      // Teste de colisão entre o Jogador e cada um dos Adversários
       for (let j = 0; j < g.npcs.length; j++) {
         const m = g.npcs[j];
-        const d = Math.hypot(g.player.x - m.x, g.player.y - m.y);
-        if (d < (PLAYER_RADIUS + NPC_RADIUS) * 0.82) {
+        const d = Math.hypot(g.player.x - m.x, g.player.y - m.y); // Calcula a distância entre eles
+        if (d < (PLAYER_RADIUS + NPC_RADIUS) * 0.82) { // Se a distância for menor que a soma dos raios -> Batida!
           triggerGameOver((g.player.x + m.x) / 2, (g.player.y + m.y) / 2);
           break;
         }
       }
     } else if (g.screen === 'start') {
+      // Movimento suave de câmera no menu inicial
       g.camera.x += (0 - g.camera.x) * 0.01;
       g.camera.y += (-260 - g.camera.y) * 0.01;
     }
   };
 
+  // Hook que inicia o Game Loop assim que o componente entra na tela
   useEffect(() => {
     let raf;
     let last = Date.now();
     const loop = () => {
       const now = Date.now();
+      // Calcula o intervalo de tempo delta (dt) entre quadros
       const dt = Math.min((now - last) / 1000, 0.05);
       last = now;
-      update(dt);
-      forceRender((f) => f + 1);
-      raf = requestAnimationFrame(loop);
+      update(dt); // Atualiza lógica do jogo
+      forceRender((f) => f + 1); // Redesenha a tela
+      raf = requestAnimationFrame(loop); // Pede o próximo quadro
     };
     raf = requestAnimationFrame(loop);
+    // Limpeza ao fechar o componente: cancela o loop e remove listeners
     return () => {
       if (raf) cancelAnimationFrame(raf);
       if (motionSub.current) {
@@ -356,6 +497,7 @@ export default function Game() {
     };
   }, []);
 
+  // Funções para registrar os toques nos botões da tela
   const setTouchLeft = (down) => {
     stateRef.current.touchSteer = down ? -1 : stateRef.current.touchSteer === -1 ? 0 : stateRef.current.touchSteer;
   };
@@ -364,10 +506,13 @@ export default function Game() {
   };
 
   const g = stateRef.current;
+  // Calcula a rotação da ponteira do indicador de direção
   const needleDeg = (g.steerDisplay || 0) * 48;
+  // Calcula o efeito de tremer a tela
   const shakeMag = g.shakeTime > 0 ? (g.shakeTime / 0.35) * 9 : 0;
   const shakeX = shakeMag ? (Math.random() - 0.5) * shakeMag : 0;
   const shakeY = shakeMag ? (Math.random() - 0.5) * shakeMag : 0;
+  // Matriz de transformação para posicionar o mundo do jogo relativo à câmera
   const worldTransform = [
     { translateX: winW / 2 - g.camera.x + shakeX },
     { translateY: winH / 2 - g.camera.y + shakeY },
@@ -377,19 +522,27 @@ export default function Game() {
 
   return (
     <View style={styles.container}>
+      {/* CANVAS SKIA: Área principal onde todo o gráfico do jogo é pintado */}
       <Canvas style={{ width: winW, height: winH }}>
+        {/* Fundo de Grama */}
         <Fill color={COLOR_GRASS} />
         <Group transform={worldTransform}>
+          {/* Asfalto Externo da Pista */}
           <Oval x={-TRACK_OUTER_X} y={-TRACK_OUTER_Y} width={TRACK_OUTER_X * 2} height={TRACK_OUTER_Y * 2} color={COLOR_ASPHALT} />
+          {/* Canteiro Central (Grama Interna) */}
           <Oval x={-TRACK_INNER_X} y={-TRACK_INNER_Y} width={TRACK_INNER_X * 2} height={TRACK_INNER_Y * 2} color={COLOR_GRASS} />
+          {/* Zebras/Bordas Externa e Interna */}
           <Oval x={-TRACK_OUTER_X} y={-TRACK_OUTER_Y} width={TRACK_OUTER_X * 2} height={TRACK_OUTER_Y * 2} style="stroke" strokeWidth={6} color={COLOR_EDGE} />
           <Oval x={-TRACK_INNER_X} y={-TRACK_INNER_Y} width={TRACK_INNER_X * 2} height={TRACK_INNER_Y * 2} style="stroke" strokeWidth={6} color={COLOR_EDGE} />
+          {/* Linha Tracejada Amarela no Meio da Pista */}
           <Oval x={-trackMidX} y={-trackMidY} width={trackMidX * 2} height={trackMidY * 2} style="stroke" strokeWidth={4} color={COLOR_AMBER}>
             <DashPathEffect intervals={[22, 22]} />
           </Oval>
+          {/* Renderiza os quadriculados da Linha de Chegada */}
           {START_LINE.map((seg, i) => (
             <Rect key={'sl' + i} x={-8} y={seg.y} width={16} height={seg.h} color={seg.color} />
           ))}
+          {/* Renderiza as árvores e arbustos de decoração */}
           {PROPS.map((p, i) => (
             <Group key={'prop' + i}>
               <Oval x={p.x - p.r * 0.9} y={p.y + p.r * 0.5 - p.r * 0.35} width={p.r * 1.8} height={p.r * 0.7} color="rgba(0,0,0,0.18)" />
@@ -397,10 +550,13 @@ export default function Game() {
               <Circle cx={p.x} cy={p.y - (p.bush ? 0 : p.r * 0.3)} r={p.r * (p.bush ? 0.7 : 0.55)} color={p.bush ? '#3f8a3f' : '#2f7a3a'} />
             </Group>
           ))}
+          {/* Renderiza os carros adversários */}
           {g.npcs.map((n, i) => (
             <CarShape key={'npc' + i} x={n.x} y={n.y} angle={n.angle} len={NPC_LEN} wid={NPC_WID} color={n.color} isPlayer={false} />
           ))}
+          {/* Renderiza o carro do Jogador */}
           <CarShape x={g.player.x} y={g.player.y} angle={g.player.angle} len={PLAYER_LEN} wid={PLAYER_WID} color={COLOR_CYAN} isPlayer />
+          {/* Renderiza as faíscas da batida */}
           {g.particles.map((p, i) => (
             <Group key={'part' + i} opacity={Math.max(0, p.life / p.maxLife)}>
               <Rect x={p.x - 3} y={p.y - 3} width={6} height={6} color={p.color} />
@@ -409,14 +565,17 @@ export default function Game() {
         </Group>
       </Canvas>
 
+      {/* INTERFACE HUD (Exibida durante a corrida) */}
       {screen === 'playing' && (
         <>
+          {/* Painel com Cronômetro */}
           <View pointerEvents="none" style={[styles.hudTimerWrap, { top: insets.top + 16 }]}>
             <View style={styles.hudTimerPill}>
               <Text style={styles.hudLabel}>Tempo</Text>
               <Text style={styles.hudTimerValue}>{formatTime(g.elapsed)}</Text>
             </View>
           </View>
+          {/* Mostrador analógico do volante/inclinação */}
           <View pointerEvents="none" style={[styles.gaugeWrap, { bottom: insets.bottom + 22 }]}>
             <View style={styles.gauge}>
               <View style={styles.gaugePivot}>
@@ -424,6 +583,7 @@ export default function Game() {
               </View>
             </View>
           </View>
+          {/* Botões de toque para a esquerda e direita */}
           <TouchableOpacity activeOpacity={0.6} style={[styles.tbtn, styles.tbtnLeft, { bottom: insets.bottom + 20 }]} onPressIn={() => setTouchLeft(true)} onPressOut={() => setTouchLeft(false)}>
             <Text style={styles.tbtnText}>◀</Text>
           </TouchableOpacity>
@@ -433,16 +593,19 @@ export default function Game() {
         </>
       )}
 
+      {/* TELA INICIAL (MENU DE INÍCIO) */}
       {screen === 'start' && (
         <View style={styles.screen}>
           <View style={styles.card}>
             <Text style={styles.eyebrow}>🏁 Corrida Turbo</Text>
             <Text style={styles.h1}>Sinta a pista.{'\n'}Incline pra virar.</Text>
             <Text style={styles.sub}>Segure o celular na horizontal e incline para a esquerda ou direita pra guiar o carro. Desvie do tráfego.</Text>
+            {/* Opção para inverter os controles */}
             <TouchableOpacity style={styles.invertRow} activeOpacity={0.7} onPress={() => setInvertChecked((v) => !v)}>
               <View style={[styles.checkbox, invertChecked && styles.checkboxChecked]}>{invertChecked && <Text style={styles.checkboxMark}>✓</Text>}</View>
               <Text style={styles.invertLabel}>Inverter direção do sensor</Text>
             </TouchableOpacity>
+            {/* Botão para iniciar o jogo */}
             <TouchableOpacity style={styles.btnPrimary} activeOpacity={0.85} onPress={handlePlayPress}>
               <Text style={styles.btnPrimaryText}>▶ Jogar</Text>
             </TouchableOpacity>
@@ -451,6 +614,7 @@ export default function Game() {
         </View>
       )}
 
+      {/* TELA DE SOLICITAÇÃO DE PERMISSÃO (EXCLUSIVA iOS) */}
       {screen === 'permission' && (
         <View style={styles.screen}>
           <View style={styles.card}>
@@ -467,6 +631,7 @@ export default function Game() {
         </View>
       )}
 
+      {/* TELA DE FIM DE JOGO (GAME OVER) */}
       {screen === 'gameover' && (
         <View style={styles.screen}>
           <View style={styles.card}>
@@ -476,6 +641,7 @@ export default function Game() {
               <View style={styles.statBlock}><Text style={styles.statLabel}>Tempo</Text><Text style={styles.statValue}>{finalTimeText}</Text></View>
               <View style={styles.statBlock}><Text style={styles.statLabel}>Melhor</Text><Text style={styles.statValue}>{bestTimeText}</Text></View>
             </View>
+            {/* Botão de reiniciar/renascer */}
             <TouchableOpacity style={styles.btnPrimary} activeOpacity={0.85} onPress={handleRespawnPress}>
               <Text style={styles.btnPrimaryText}>🔄 Renascer</Text>
             </TouchableOpacity>
@@ -486,6 +652,7 @@ export default function Game() {
   );
 }
 
+/* ============ ESTILOS DA INTERFACE (CSS-in-JS) ============ */
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLOR_BG_DEEP },
   screen: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: 'rgba(9,11,15,0.92)' },
